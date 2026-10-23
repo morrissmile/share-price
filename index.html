@@ -1,660 +1,461 @@
 <!DOCTYPE html>
-<html lang="zh-TW" class="dark">
+<html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>寶物分贓計算器</title>
-    <!-- Tailwind CSS CDN -->
+    <!-- 引入 Tailwind CSS 確保排版美觀 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        game: {
-                            base: '#0f172a',
-                            card: '#1e293b',
-                            accent: '#6366f1',
-                            gold: '#f59e0b',
-                            green: '#10b981',
-                            red: '#ef4444'
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <!-- Vue 3 CDN -->
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        [v-cloak] { display: none; }
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: #0b0f19;
-            color: #f3f4f6;
-        }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
-        }
+        body { font-family: system-ui, -apple-system, sans-serif; }
     </style>
 </head>
-<body class="min-h-screen pb-12">
-    <div id="app" v-cloak class="max-w-6xl mx-auto px-4 py-6">
+<body class="bg-slate-50 text-slate-800 min-p-4 md:p-8">
+    <div class="max-w-4xl mx-auto space-y-6">
         
-        <!-- Header -->
-        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-slate-800">
+        <!-- 標題區 -->
+        <header class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-                <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-indigo-400 to-purple-500 flex items-center gap-3">
-                    <i class="fa-solid me-1 fa-coins text-amber-400"></i> 寶物分贓計算器
-                </h1>
-                <p class="text-slate-400 text-sm mt-1">打寶分錢好幫手：自動計算隊員獨吞與平分金額</p>
+                <h1 class="text-2xl font-bold text-slate-900">⚔️ 隊伍寶物分贓計算器</h1>
+                <p class="text-sm text-slate-500 mt-1">公平分帳，買家自食其果（買家無法均分自己買裝的錢）</p>
             </div>
-            <div class="flex items-center gap-2">
-                <button @click="loadExample" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> 載入範例
-                </button>
-                <button @click="resetAll" class="px-3 py-2 bg-slate-800 hover:bg-red-950/50 hover:text-red-400 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 hover:border-red-800/50 transition flex items-center gap-1.5">
-                    <i class="fa-solid fa-trash-can"></i> 重置清空
-                </button>
+            <div class="flex gap-2 w-full md:w-auto">
+                <button onclick="loadSample()" class="flex-1 md:flex-none px-4 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition">載入範例</button>
+                <button onclick="resetAll()" class="flex-1 md:flex-none px-4 py-2 text-sm bg-rose-50 hover:bg-rose-100 text-rose-600 font-medium rounded-xl transition">全部重設</button>
             </div>
         </header>
 
-        <!-- Main Layout Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            
-            <!-- Left Column: Settings & Items Input (7 cols) -->
-            <div class="lg:col-span-7 space-y-6">
-                
-                <!-- 1. Team Members Setup -->
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
-                            <i class="fa-solid fa-users text-indigo-400"></i> 隊伍成員設定 
-                            <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-normal">
-                                共 {{ members.length }} 人
-                            </span>
-                        </h2>
-                        <div class="flex items-center gap-2">
-                            <button @click="showImportModal = !showImportModal" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-300 font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-md">
-                                <i class="fa-solid fa-file-import"></i> 批次文字匯入
-                            </button>
-                            <button @click="addMember" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-md">
-                                <i class="fa-solid fa-plus"></i> 新增成員
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Batch Import Area (Expandable/Modal Panel) -->
-                    <div v-if="showImportModal" class="mb-4 bg-slate-800/90 border border-indigo-500/40 rounded-xl p-4 transition-all">
-                        <div class="flex items-center justify-between mb-2">
-                            <label class="text-xs font-bold text-indigo-300 flex items-center gap-1">
-                                <i class="fa-solid fa-paste"></i> 貼上成員名單（以空格、換行、逗號或頓號分隔）
-                            </label>
-                            <button @click="showImportModal = false" class="text-slate-400 hover:text-slate-200 text-xs">
-                                <i class="fa-solid fa-xmark"></i> 關閉
-                            </button>
-                        </div>
-                        <textarea 
-                            v-model="importText" 
-                            rows="3" 
-                            placeholder="例如貼上：&#10;玩家A 玩家B 玩家C 玩家D&#10;或&#10;玩家A, 玩家B, 玩家C, 玩家D"
-                            class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono mb-3"
-                        ></textarea>
-                        <div class="flex items-center justify-between gap-2">
-                            <span class="text-[11px] text-slate-400">
-                                預覽解析：<span class="text-amber-400 font-semibold">{{ parsedImportNames.length }}</span> 位成員
-                            </span>
-                            <div class="flex items-center gap-2">
-                                <button 
-                                    @click="processImport(false)" 
-                                    :disabled="parsedImportNames.length === 0"
-                                    class="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-medium px-3 py-1.5 rounded-lg transition"
-                                >
-                                    覆蓋現有名單
-                                </button>
-                                <button 
-                                    @click="processImport(true)" 
-                                    :disabled="parsedImportNames.length === 0"
-                                    class="text-xs bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-indigo-300 font-medium px-3 py-1.5 rounded-lg transition"
-                                >
-                                    追加到現有名單
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Member Tags List -->
-                    <div class="flex flex-wrap gap-2 mb-3">
-                        <div v-for="(member, idx) in members" :key="idx" class="flex items-center bg-slate-800 border border-slate-700 rounded-lg overflow-hidden group hover:border-indigo-500/50 transition">
-                            <input 
-                                type="text" 
-                                v-model="members[idx]" 
-                                class="bg-transparent text-xs text-slate-200 px-2.5 py-1.5 w-24 focus:outline-none focus:bg-slate-900 focus:text-indigo-300 font-medium"
-                                placeholder="成員名字"
-                            />
-                            <button 
-                                @click="removeMember(idx)" 
-                                :disabled="members.length <= 1"
-                                class="text-slate-500 hover:text-red-400 px-2 py-1.5 transition disabled:opacity-30 disabled:hover:text-slate-500"
-                                title="移除成員"
-                            >
-                                <i class="fa-solid fa-xmark text-xs"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 2. Loot Items List & Input -->
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
-                            <i class="fa-solid fa-gem text-amber-400"></i> 寶物清單登記
-                        </h2>
-                        <button @click="addItem" class="text-xs bg-amber-600 hover:bg-amber-500 text-white font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-md">
-                            <i class="fa-solid fa-plus"></i> 新增寶物
-                        </button>
-                    </div>
-
-                    <!-- Empty State -->
-                    <div v-if="items.length === 0" class="text-center py-10 border-2 border-dashed border-slate-800 rounded-xl">
-                        <i class="fa-solid fa-box-open text-3xl text-slate-600 mb-2"></i>
-                        <p class="text-slate-500 text-sm">目前沒有寶物，點擊右上角「新增寶物」開始記錄吧！</p>
-                    </div>
-
-                    <!-- Item Cards -->
-                    <div class="space-y-4">
-                        <div v-for="(item, index) in items" :key="item.id" class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 relative group hover:border-slate-600 transition">
-                            
-                            <!-- Card Header: Title & Delete Button -->
-                            <div class="flex items-center justify-between gap-3 mb-3">
-                                <div class="flex items-center gap-2 flex-1">
-                                    <span class="text-xs font-bold text-slate-500 bg-slate-800 px-2 py-1 rounded">#{{ index + 1 }}</span>
-                                    <input 
-                                        type="text" 
-                                        v-model="item.name" 
-                                        placeholder="寶物名稱 (例如：滅世烈焰劍)"
-                                        class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 flex-1"
-                                    />
-                                </div>
-                                <button @click="removeItem(index)" class="text-slate-500 hover:text-red-400 p-1.5 transition">
-                                    <i class="fa-solid fa-trash-can"></i>
-                                </button>
-                            </div>
-
-                            <!-- Price & Sale Type -->
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-400 mb-1">寶物售價 / 出價 ($P)</label>
-                                    <div class="relative">
-                                        <span class="absolute left-3 top-2 text-slate-500 text-xs">$</span>
-                                        <input 
-                                            type="number" 
-                                            v-model.number="item.price" 
-                                            min="0"
-                                            placeholder="0"
-                                            class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-7 pr-3 py-1.5 text-sm text-amber-400 font-bold focus:outline-none focus:border-indigo-500"
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-slate-400 mb-1">處理管道</label>
-                                    <select 
-                                        v-model="item.type" 
-                                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
-                                    >
-                                        <option value="public">直接賣出 (所有人平分)</option>
-                                        <option value="member">隊員購買 (買家不參與分錢)</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <!-- Member Buyers Selector (If item.type === 'member') -->
-                            <div v-if="item.type === 'member'" class="mt-3 pt-3 border-t border-slate-700/60">
-                                <label class="block text-xs font-medium text-amber-400 mb-2">
-                                    <i class="fa-solid fa-cart-shopping me-1"></i> 請勾選購買的隊員（買家）:
-                                </label>
-                                <div class="flex flex-wrap gap-2">
-                                    <label 
-                                        v-for="m in members" 
-                                        :key="m" 
-                                        class="inline-flex items-center gap-1.5 bg-slate-900 border px-2.5 py-1 rounded-lg cursor-pointer text-xs transition"
-                                        :class="item.buyers.includes(m) ? 'border-amber-500 bg-amber-500/10 text-amber-300 font-semibold' : 'border-slate-700 text-slate-400 hover:border-slate-600'"
-                                    >
-                                        <input 
-                                            type="checkbox" 
-                                            :value="m" 
-                                            v-model="item.buyers"
-                                            class="hidden"
-                                        />
-                                        <i class="fa-solid" :class="item.buyers.includes(m) ? 'fa-square-check text-amber-400' : 'fa-square text-slate-600'"></i>
-                                        <span>{{ m }}</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <!-- Calculation Note Badge -->
-                            <div class="mt-3 bg-slate-900/80 rounded-lg p-2.5 text-xs text-slate-400 flex items-center justify-between">
-                                <span v-if="item.type === 'public'">
-                                    <i class="fa-solid fa-circle-info text-indigo-400 me-1"></i> 
-                                    全隊 {{ members.length }} 人平分，每人分得：
-                                    <strong class="text-emerald-400">${{ Math.round(getItemSplit(item).sharePerPerson) }}</strong>
-                                </span>
-                                <span v-else-if="item.buyers.length === 0" class="text-amber-400/90">
-                                    <i class="fa-solid fa-triangle-exclamation me-1"></i> 請選擇至少一位購買者！
-                                </span>
-                                <span v-else-if="item.buyers.length >= members.length" class="text-red-400">
-                                    <i class="fa-solid fa-triangle-exclamation me-1"></i> 所有人都是買家，無人可分錢！
-                                </span>
-                                <span v-else>
-                                    <i class="fa-solid fa-circle-info text-amber-400 me-1"></i> 
-                                    {{ item.buyers.length }} 人購買，其他 {{ members.length - item.buyers.length }} 人平分，每位非買家分得：
-                                    <strong class="text-emerald-400">${{ Math.round(getItemSplit(item).sharePerPerson) }}</strong>
-                                </span>
-                            </div>
-
-                        </div>
-                    </div>
-                </div>
-
+        <!-- 區塊一：成員管理 (支援文字批次匯入) -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <span>👥</span> 隊伍成員設定
+                </h2>
+                <span id="memberCountBadge" class="text-xs bg-indigo-50 text-indigo-600 font-semibold px-2.5 py-1 rounded-full">共 0 人</span>
             </div>
 
-            <!-- Right Column: Final Settlement Dashboard (5 cols) -->
-            <div class="lg:col-span-5 space-y-6">
-                
-                <!-- Final Result Card -->
-                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl sticky top-6">
-                    <div class="flex items-center justify-between mb-5 pb-3 border-b border-slate-800">
-                        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
-                            <i class="fa-solid fa-calculator text-emerald-400"></i> 最終結算總表
-                        </h2>
-                        <button 
-                            @click="copySummary" 
-                            class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-md"
-                        >
-                            <i class="fa-solid fa-copy"></i> 複製文字結果
-                        </button>
-                    </div>
-
-                    <!-- Overall Summary Stats -->
-                    <div class="grid grid-cols-2 gap-3 mb-5">
-                        <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50">
-                            <div class="text-xs text-slate-400 mb-1">寶物總總額</div>
-                            <div class="text-xl font-black text-amber-400">${{ totalLootValue }}</div>
-                        </div>
-                        <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50">
-                            <div class="text-xs text-slate-400 mb-1">登記總件數</div>
-                            <div class="text-xl font-black text-indigo-400">{{ items.length }} 件</div>
-                        </div>
-                    </div>
-
-                    <!-- Per-Member Settlement List -->
-                    <div class="space-y-3 mb-6">
-                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">個人收支明細</h3>
-                        
-                        <div 
-                            v-for="stat in memberStats" 
-                            :key="stat.name" 
-                            class="bg-slate-800/50 border border-slate-700/60 rounded-xl p-3.5 transition hover:border-slate-600"
-                        >
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="font-bold text-slate-200 text-sm flex items-center gap-1.5">
-                                    <i class="fa-solid fa-user-circle text-slate-400"></i> {{ stat.name }}
-                                </span>
-                                <!-- Net badge -->
-                                <span 
-                                    class="text-xs font-extrabold px-2.5 py-1 rounded-md"
-                                    :class="{
-                                        'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30': stat.net > 0,
-                                        'bg-red-500/20 text-red-400 border border-red-500/30': stat.net < 0,
-                                        'bg-slate-700 text-slate-300': stat.net === 0
-                                    }"
-                                >
-                                    {{ stat.net > 0 ? '應領取 +' + Math.round(stat.net) : (stat.net < 0 ? '應補繳 -' + Math.abs(Math.round(stat.net)) : '不拿不付 $0') }}
-                                </span>
-                            </div>
-
-                            <div class="grid grid-cols-2 gap-2 text-xs text-slate-400 bg-slate-900/60 p-2 rounded-lg">
-                                <div>
-                                    <span>分紅收益：</span>
-                                    <span class="text-emerald-400 font-semibold">+${{ Math.round(stat.gain) }}</span>
-                                </div>
-                                <div>
-                                    <span>買裝支出：</span>
-                                    <span class="text-red-400 font-semibold">-${{ Math.round(stat.spent) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Transfer Guidance / Lazy Pack -->
-                    <div class="bg-indigo-950/40 border border-indigo-800/40 rounded-xl p-4">
-                        <h4 class="text-xs font-bold text-indigo-300 mb-2 flex items-center gap-1.5">
-                            <i class="fa-solid fa-comments-dollar"></i> 團隊結算懶人包
-                        </h4>
-                        <ul class="text-xs text-slate-300 space-y-1.5 list-disc list-inside">
-                            <li v-for="guide in transferGuide" :key="guide">
-                                {{ guide }}
-                            </li>
-                            <li v-if="transferGuide.length === 0" class="text-slate-500 list-none italic">
-                                尚無需要進行的轉帳。
-                            </li>
-                        </ul>
-                    </div>
-
+            <!-- 批次文字匯入區塊 -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                <div class="flex justify-between items-center">
+                    <label class="text-sm font-semibold text-slate-700">快速批次文字匯入</label>
+                    <span class="text-xs text-slate-500">支援空白、換行、逗號、頓號分隔</span>
                 </div>
-
+                <textarea id="batchInput" rows="2" placeholder="例如: 玩家A 玩家B 玩家C 玩家D (或直接貼上一行/換行名單)" class="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"></textarea>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-4 text-sm">
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" name="importMode" value="replace" checked class="text-indigo-600 focus:ring-indigo-500">
+                            <span>覆蓋現有名單</span>
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" name="importMode" value="append" class="text-indigo-600 focus:ring-indigo-500">
+                            <span>追加到現有名單</span>
+                        </label>
+                    </div>
+                    <button onclick="batchImportMembers()" class="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-lg transition shadow-sm">
+                        一鍵匯入名單
+                    </button>
+                </div>
             </div>
 
-        </div>
+            <!-- 單一新增與清單 -->
+            <div class="flex gap-2">
+                <input type="text" id="newMemberName" placeholder="輸入單個隊員名稱 (例如: 亞瑟)" onkeypress="if(event.key==='Enter') addMember()" class="flex-1 px-4 py-2 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm">
+                <button onclick="addMember()" class="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium rounded-xl transition">新增成員</button>
+            </div>
 
-        <!-- Toast Notification -->
-        <div 
-            v-if="toastMessage" 
-            class="fixed bottom-6 right-6 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs font-bold flex items-center gap-2 transition transform animate-bounce"
-        >
-            <i class="fa-solid fa-circle-check"></i> {{ toastMessage }}
-        </div>
+            <!-- 成員標籤清單 -->
+            <div id="memberList" class="flex flex-wrap gap-2 pt-2">
+                <!-- 動態生成 -->
+            </div>
+        </section>
+
+        <!-- 區塊二：寶物登記區 -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <span>💎</span> 寶物登記與分配
+                </h2>
+                <button onclick="addItem()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-xl transition shadow-sm flex items-center gap-1">
+                    <span>+</span> 新增寶物
+                </button>
+            </div>
+
+            <div id="itemList" class="space-y-3">
+                <!-- 動態生成寶物卡片 -->
+            </div>
+        </section>
+
+        <!-- 區塊三：最終結算總表 -->
+        <section class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 space-y-4">
+            <h2 class="text-lg font-bold text-slate-800 flex items-center gap-2">
+                <span>📊</span> 最終結算總表
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-200 text-slate-500 text-xs font-semibold uppercase tracking-wider">
+                            <th class="py-3 px-4">成員</th>
+                            <th class="py-3 px-4">買裝總花費</th>
+                            <th class="py-3 px-4">分紅總收益</th>
+                            <th class="py-3 px-4 text-right">最終結算 (淨收支)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="summaryTableBody" class="divide-y divide-slate-100 text-sm">
+                        <!-- 動態生成 -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- 區塊四：一鍵複製頻道通知 -->
+        <section class="bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-6 rounded-2xl shadow-md space-y-4">
+            <div class="flex justify-between items-center">
+                <h2 class="text-lg font-bold flex items-center gap-2">
+                    <span>📋</span> 隊伍頻道結算通知
+                </h2>
+                <button onclick="copyDiscordReport()" class="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold rounded-xl transition shadow-sm flex items-center gap-2">
+                    <span>📄</span> 複製結算明細文字
+                </button>
+            </div>
+            <textarea id="reportOutput" readonly rows="5" class="w-full bg-slate-800/80 border border-slate-700 rounded-xl p-3 text-xs md:text-sm font-mono text-slate-200 focus:outline-none resize-none" placeholder="點擊上方按鈕生成可直接貼到 Discord / Line 的明細..."></textarea>
+        </section>
 
     </div>
 
+    <!-- JavaScript 邏輯與千分位格式化 -->
     <script>
-        const { createApp, ref, computed } = Vue;
+        // 資料結構
+        let state = {
+            members: [],
+            items: []
+        };
 
-        createApp({
-            setup() {
-                // Member Names State
-                const members = ref(['玩家A', '玩家B', '玩家C', '玩家D']);
+        // 千分位格式化函式
+        function formatNumber(num) {
+            if (num === '' || isNaN(num)) return '';
+            return Number(num).toLocaleString('en-US');
+        }
 
-                // Batch Import States
-                const showImportModal = ref(false);
-                const importText = ref('');
+        // 解析帶逗號的數字字串為純數字
+        function parseNumber(str) {
+            if (!str) return 0;
+            const cleaned = str.toString().replace(/,/g, '');
+            const val = parseFloat(cleaned);
+            return isNaN(val) ? 0 : val;
+        }
 
-                // Parse raw text into array of names using spaces, commas, newlines, tabs, and ideographic commas (頓號)
-                const parsedImportNames = computed(() => {
-                    if (!importText.value) return [];
-                    return importText.value
-                        .split(/[\s,，、\t\n]+/)
-                        .map(name => name.trim())
-                        .filter(name => name.length > 0);
-                });
-
-                // Execute Batch Import
-                const processImport = (append = false) => {
-                    const newNames = parsedImportNames.value;
-                    if (newNames.length === 0) return;
-
-                    if (append) {
-                        // Append uniquely
-                        const currentSet = new Set(members.value);
-                        newNames.forEach(name => currentSet.add(name));
-                        members.value = Array.from(currentSet);
-                        showToast(`已成功追加 ${newNames.length} 位成員！`);
-                    } else {
-                        // Overwrite
-                        members.value = newNames;
-                        // Clean up buyers list for non-existent members
-                        items.value.forEach(item => {
-                            item.buyers = item.buyers.filter(b => newNames.includes(b));
-                        });
-                        showToast(`已成功匯入 ${newNames.length} 位新成員！`);
-                    }
-
-                    importText.value = '';
-                    showImportModal.value = false;
-                };
-
-                // Items List State
-                const items = ref([
-                    {
-                        id: 1,
-                        name: '傳奇龍之劍',
-                        price: 12000,
-                        type: 'member',
-                        buyers: ['玩家A']
-                    },
-                    {
-                        id: 2,
-                        name: '魔法藥水裝備組',
-                        price: 4000,
-                        type: 'public',
-                        buyers: []
-                    }
-                ]);
-
-                const toastMessage = ref('');
-
-                // Helper to trigger alert toast
-                const showToast = (msg) => {
-                    toastMessage.value = msg;
-                    setTimeout(() => {
-                        toastMessage.value = '';
-                    }, 2500);
-                };
-
-                // Member Operations
-                const addMember = () => {
-                    const nextNum = members.value.length + 1;
-                    members.value.push(`玩家${nextNum}`);
-                };
-
-                const removeMember = (index) => {
-                    if (members.value.length <= 1) return;
-                    const removedName = members.value[index];
-                    members.value.splice(index, 1);
-                    
-                    // Clean up buyers list in items
-                    items.value.forEach(item => {
-                        item.buyers = item.buyers.filter(b => b !== removedName);
-                    });
-                };
-
-                // Item Operations
-                const addItem = () => {
-                    items.value.push({
-                        id: Date.now(),
-                        name: '',
-                        price: 0,
-                        type: 'public',
-                        buyers: []
-                    });
-                };
-
-                const removeItem = (index) => {
-                    items.value.splice(index, 1);
-                };
-
-                // Reset All
-                const resetAll = () => {
-                    members.value = ['玩家A', '玩家B', '玩家C', '玩家D'];
-                    items.value = [];
-                    importText.value = '';
-                    showImportModal.value = false;
-                    showToast('已重置所有資料');
-                };
-
-                // Load Example
-                const loadExample = () => {
-                    members.value = ['隊長老王', '補師小美', '狂戰阿強', '法師小明'];
-                    items.value = [
-                        { id: 1, name: '屠龍聖劍', price: 15000, type: 'member', buyers: ['狂戰阿強'] },
-                        { id: 2, name: '大天使法杖', price: 8000, type: 'member', buyers: ['法師小明'] },
-                        { id: 3, name: '雜物材料包', price: 4000, type: 'public', buyers: [] }
-                    ];
-                    showToast('已載入範例隊伍與寶物資料');
-                };
-
-                // Calculate Single Item Split
-                const getItemSplit = (item) => {
-                    const N = members.value.length;
-                    const price = Number(item.price) || 0;
-
-                    if (item.type === 'public' || item.buyers.length === 0) {
-                        return {
-                            sharePerPerson: N > 0 ? price / N : 0,
-                            buyers: []
-                        };
-                    } else {
-                        const B = item.buyers.length;
-                        const nonBuyersCount = N - B;
-                        const sharePerPerson = nonBuyersCount > 0 ? price / nonBuyersCount : 0;
-                        const pricePerBuyer = B > 0 ? price / B : 0;
-
-                        return {
-                            sharePerPerson,
-                            pricePerBuyer,
-                            buyers: item.buyers
-                        };
-                    }
-                };
-
-                // Total value of all recorded items
-                const totalLootValue = computed(() => {
-                    return items.value.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
-                });
-
-                // Compute statistics per member (Spent, Gain, Net)
-                const memberStats = computed(() => {
-                    const statsMap = {};
-
-                    members.value.forEach(m => {
-                        statsMap[m] = { name: m, spent: 0, gain: 0, net: 0 };
-                    });
-
-                    items.value.forEach(item => {
-                        const N = members.value.length;
-                        const price = Number(item.price) || 0;
-                        if (price <= 0 || N === 0) return;
-
-                        if (item.type === 'public' || item.buyers.length === 0) {
-                            const share = price / N;
-                            members.value.forEach(m => {
-                                if (statsMap[m]) statsMap[m].gain += share;
-                            });
-                        } else {
-                            const buyers = item.buyers.filter(b => members.value.includes(b));
-                            const B = buyers.length;
-                            const nonBuyers = members.value.filter(m => !buyers.includes(m));
-
-                            if (B > 0) {
-                                const costPerBuyer = price / B;
-                                buyers.forEach(b => {
-                                    if (statsMap[b]) statsMap[b].spent += costPerBuyer;
-                                });
-                            }
-
-                            if (nonBuyers.length > 0) {
-                                const share = price / nonBuyers.length;
-                                nonBuyers.forEach(nb => {
-                                    if (statsMap[nb]) statsMap[nb].gain += share;
-                                });
-                            }
-                        }
-                    });
-
-                    return Object.values(statsMap).map(s => {
-                        s.net = s.gain - s.spent;
-                        return s;
-                    });
-                });
-
-                // Generate Transfer Guidance Sentences
-                const transferGuide = computed(() => {
-                    const list = [];
-                    const payers = memberStats.value.filter(s => Math.round(s.net) < 0);
-                    const receivers = memberStats.value.filter(s => Math.round(s.net) > 0);
-
-                    if (payers.length === 0 && receivers.length === 0) {
-                        return ['無須進行金額補繳或領取。'];
-                    }
-
-                    payers.forEach(p => {
-                        list.push(`【${p.name}】需支付補繳 $${Math.abs(Math.round(p.net))} 入公款庫`);
-                    });
-
-                    receivers.forEach(r => {
-                        list.push(`【${r.name}】可從公款庫領取 $${Math.round(r.net)}`);
-                    });
-
-                    return list;
-                });
-
-                // Copy Text Result to Clipboard
-                const copySummary = () => {
-                    let text = `========================\n`;
-                    text += `⚔️ 寶物分贓結算清單 ⚔️\n`;
-                    text += `========================\n`;
-                    text += `隊伍人數：${members.value.length} 人\n`;
-                    text += `寶物總價值：$${totalLootValue.value}\n\n`;
-
-                    text += `📦 【寶物明細】\n`;
-                    items.value.forEach((item, idx) => {
-                        const price = item.price || 0;
-                        if (item.type === 'public' || item.buyers.length === 0) {
-                            text += `${idx + 1}. ${item.name || '未命名寶物'} - $${price} (公家平分)\n`;
-                        } else {
-                            text += `${idx + 1}. ${item.name || '未命名寶物'} - $${price} (買家: ${item.buyers.join(', ')})\n`;
-                        }
-                    });
-
-                    text += `\n💰 【個人結算結果】\n`;
-                    memberStats.value.forEach(s => {
-                        const netText = s.net > 0 ? `應領取 +$${Math.round(s.net)}` : (s.net < 0 ? `應補繳 -$${Math.abs(Math.round(s.net))}` : `平手 $0`);
-                        text += `• ${s.name}: ${netText} (分紅 +$${Math.round(s.gain)} / 買裝 -$${Math.round(s.spent)})\n`;
-                    });
-
-                    text += `\n📋 【轉帳懶人包】\n`;
-                    transferGuide.value.forEach(g => {
-                        text += `• ${g}\n`;
-                    });
-
-                    // Execute Copy
-                    const dummy = document.createElement('textarea');
-                    document.body.appendChild(dummy);
-                    dummy.value = text;
-                    dummy.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(dummy);
-
-                    showToast('已成功複製結算報告至剪貼簿！');
-                };
-
-                return {
-                    members,
-                    items,
-                    showImportModal,
-                    importText,
-                    parsedImportNames,
-                    processImport,
-                    toastMessage,
-                    addMember,
-                    removeMember,
-                    addItem,
-                    removeItem,
-                    resetAll,
-                    loadExample,
-                    getItemSplit,
-                    totalLootValue,
-                    memberStats,
-                    transferGuide,
-                    copySummary
-                };
+        // 綁定輸入框即時千分位轉換
+        function handlePriceInput(inputElem, itemId) {
+            let rawVal = parseNumber(inputElem.value);
+            // 更新資料狀態
+            const item = state.items.find(i => i.id === itemId);
+            if (item) {
+                item.price = rawVal;
+                calculate();
             }
-        }).mount('#app');
+            // 游標保持與格式化呈現
+            // 為了輸入流暢，只在失焦或數值確定後完整格式化，或者即時格式化
+            const cursorPosition = inputElem.selectionStart;
+            inputElem.value = rawVal === 0 && inputElem.value === '' ? '' : formatNumber(rawVal);
+        }
+
+        // 初始化載入
+        window.onload = function() {
+            loadFromLocalStorage();
+            if (state.members.length === 0 && state.items.length === 0) {
+                loadSample();
+            } else {
+                renderAll();
+            }
+        };
+
+        function saveToLocalStorage() {
+            localStorage.setItem('loot_calculator_state', JSON.stringify(state));
+        }
+
+        function loadFromLocalStorage() {
+            const saved = localStorage.getItem('loot_calculator_state');
+            if (saved) {
+                try { state = JSON.parse(saved); } catch(e) {}
+            }
+        }
+
+        function resetAll() {
+            if (confirm('確定要清空所有成員與寶物資料嗎？')) {
+                state = { members: [], items: [] };
+                saveToLocalStorage();
+                renderAll();
+            }
+        }
+
+        function loadSample() {
+            state.members = ["玩家A", "玩家B", "玩家C", "玩家D"];
+            state.items = [
+                { id: 1, name: "傳說之劍", price: 1000000, buyer: "玩家A" },
+                { id: 2, name: "防禦護符", price: 200000, buyer: "" }
+            ];
+            saveToLocalStorage();
+            renderAll();
+        }
+
+        // 成員管理
+        function addMember() {
+            const input = document.getElementById('newMemberName');
+            const name = input.value.trim();
+            if (!name) return;
+            if (state.members.includes(name)) {
+                alert('此成員已經存在！');
+                return;
+            }
+            state.members.push(name);
+            input.value = '';
+            saveToLocalStorage();
+            renderAll();
+        }
+
+        function removeMember(name) {
+            state.members = state.members.filter(m => m !== name);
+            // 同時清除寶物買家中包含此人的設定
+            state.items.forEach(item => {
+                if (item.buyer === name) item.buyer = "";
+            });
+            saveToLocalStorage();
+            renderAll();
+        }
+
+        // 批次匯入成員
+        function batchImportMembers() {
+            const text = document.getElementById('batchInput').value;
+            if (!text.trim()) {
+                alert('請先輸入要匯入的名單文字！');
+                return;
+            }
+
+            // 支援空白、換行、逗號、頓號、Tab 分隔
+            const rawNames = text.split(/[\s,\，、\t\n]+/);
+            const newNames = [...new Set(rawNames.map(n => n.trim()).filter(n => n.length > 0))];
+
+            if (newNames.length === 0) {
+                alert('沒有解析到有效的成員名稱！');
+                return;
+            }
+
+            const mode = document.querySelector('input[name="importMode"]:checked').value;
+
+            if (mode === 'replace') {
+                state.members = newNames;
+            } else {
+                // 追加並去除重複
+                const combined = [...state.members, ...newNames];
+                state.members = [...new Set(combined)];
+            }
+
+            document.getElementById('batchInput').value = '';
+            saveToLocalStorage();
+            renderAll();
+        }
+
+        // 寶物管理
+        function addItem() {
+            const newItem = {
+                id: Date.now(),
+                name: `寶物 ${state.items.length + 1}`,
+                price: 0,
+                buyer: ""
+            };
+            state.items.push(newItem);
+            saveToLocalStorage();
+            renderAll();
+        }
+
+        function removeItem(id) {
+            state.items = state.items.filter(i => i.id !== id);
+            saveToLocalStorage();
+            renderAll();
+        }
+
+        function updateItemField(id, field, value) {
+            const item = state.items.find(i => i.id === id);
+            if (item) {
+                if (field === 'price') {
+                    item.price = parseNumber(value);
+                } else {
+                    item[field] = value;
+                }
+                saveToLocalStorage();
+                renderCalculationOnly(); // 局部重新計算顯示，不破壞輸入焦點
+            }
+        }
+
+        // 渲染全部
+        function renderAll() {
+            renderMembers();
+            renderItems();
+            calculate();
+        }
+
+        function renderMembers() {
+            const badge = document.getElementById('memberCountBadge');
+            badge.innerText = `共 ${state.members.length} 人`;
+
+            const container = document.getElementById('memberList');
+            if (state.members.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 italic">尚未加入任何隊員，請透過上方文字批次匯入或單個新增。</p>`;
+                return;
+            }
+
+            container.innerHTML = state.members.map(m => `
+                <div class="inline-flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-sm transition">
+                    <span class="font-medium">${m}</span>
+                    <button onclick="removeMember('${m}')" class="text-slate-400 hover:text-rose-600 font-bold px-1">&times;</button>
+                </div>
+            `).join('');
+        }
+
+        function renderItems() {
+            const container = document.getElementById('itemList');
+            if (state.items.length === 0) {
+                container.innerHTML = `<div class="text-center py-8 text-slate-400 border border-dashed border-slate-200 rounded-xl text-sm">目前沒有登記寶物，請點擊上方「+ 新增寶物」</div>`;
+                return;
+            }
+
+            container.innerHTML = state.items.map(item => `
+                <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
+                    <div class="flex flex-col md:flex-row gap-3 w-full md:w-auto flex-1">
+                        <input type="text" value="${item.name}" oninput="updateItemField(${item.id}, 'name', this.value)" placeholder="寶物名稱" class="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none w-full md:w-48">
+                        
+                        <div class="relative flex-1 md:w-40">
+                            <input type="text" value="${item.price ? formatNumber(item.price) : ''}" oninput="handlePriceInput(this, ${item.id})" placeholder="售出價格" class="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none w-full text-right pr-8">
+                            <span class="absolute right-3 top-2.5 text-xs text-slate-400 pointer-events-none">元</span>
+                        </div>
+
+                        <select onchange="updateItemField(${item.id}, 'buyer', this.value)" class="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none w-full md:w-44">
+                            <option value="">-- 無人買 (直接變現) --</option>
+                            ${state.members.map(m => `<option value="${m}" ${item.buyer === m ? 'selected' : ''}>${m} 內購自留</option>`).join('')}
+                        </select>
+                    </div>
+
+                    <div class="flex items-center justify-between w-full md:w-auto gap-4">
+                        <div id="item-hint-${item.id}" class="text-xs text-slate-500 font-medium"></div>
+                        <button onclick="removeItem(${item.id})" class="text-rose-500 hover:text-rose-700 text-sm font-medium px-2 py-1">刪除</button>
+                    </div>
+                </div>
+            `).join('');
+
+            calculate();
+        }
+
+        // 計算核心與總表呈現
+        function calculate() {
+            renderCalculationOnly();
+        }
+
+        function renderCalculationOnly() {
+            const totalMembersCount = state.members.length;
+            
+            // 初始化結算結構
+            let stats = {};
+            state.members.forEach(m => {
+                stats[m] = { spent: 0, earned: 0, net: 0 };
+            });
+
+            // 逐筆寶物計算
+            state.items.forEach(item => {
+                const price = Number(item.price) || 0;
+                const buyer = item.buyer;
+                const hintElem = document.getElementById(`item-hint-${item.id}`);
+
+                if (totalMembersCount === 0) {
+                    if (hintElem) hintElem.innerText = `⚠️ 尚無隊员`;
+                    return;
+                }
+
+                if (!buyer) {
+                    // 情況A：無人購買，全體平分
+                    const share = price / totalMembersCount;
+                    state.members.forEach(m => {
+                        stats[m].earned += share;
+                    });
+                    if (hintElem) hintElem.innerText = `💡 全體 ${totalMembersCount} 人平分，每人得 ${formatNumber(Math.round(share))} 元`;
+                } else {
+                    // 情況B：有人購買
+                    stats[buyer].spent += price; // 買家付全額
+                    
+                    const nonBuyers = state.members.filter(m => m !== buyer);
+                    const nonBuyersCount = nonBuyers.length;
+
+                    if (nonBuyersCount === 0) {
+                        if (hintElem) hintElem.innerText = `⚠️ 唯一成員自買，無人可分`;
+                    } else {
+                        const share = price / nonBuyersCount;
+                        nonBuyers.forEach(m => {
+                            stats[m].earned += share;
+                        });
+                        if (hintElem) hintElem.innerText = `💡 買家 ${buyer} 實付，其餘 ${nonBuyersCount} 人平分，每人得 ${formatNumber(Math.round(share))} 元`;
+                    }
+                }
+            });
+
+            // 計算最終淨收支 (net = earned - spent)
+            // 若為買家：earned 為 0 (假設他沒分到這筆錢)，net = 0 - spent = -spent
+            Object.keys(stats).forEach(m => {
+                stats[m].net = stats[m].earned - stats[m].spent;
+            });
+
+            // 渲染總表
+            const tbody = document.getElementById('summaryTableBody');
+            if (state.members.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-400">尚無隊員資料</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = state.members.map(m => {
+                const data = stats[m];
+                const netColor = data.net > 0 ? 'text-emerald-600 font-bold' : (data.net < 0 ? 'text-rose-600 font-bold' : 'text-slate-600');
+                const netSign = data.net > 0 ? '+' : '';
+                return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                        <td class="py-3 px-4 font-semibold text-slate-800">${m}</td>
+                        <td class="py-3 px-4 text-slate-600">${data.spent > 0 ? '-' + formatNumber(Math.round(data.spent)) + ' 元' : '-'}</td>
+                        <td class="py-3 px-4 text-slate-600">${data.earned > 0 ? '+' + formatNumber(Math.round(data.earned)) + ' 元' : '-'}</td>
+                        <td class="py-3 px-4 text-right ${netColor}">${netSign}${formatNumber(Math.round(data.net))} 元</td>
+                    </tr>
+                `;
+            }).join('');
+
+            generateReportText(stats);
+            saveToLocalStorage();
+        }
+
+        // 生成複製文字
+        function generateReportText(stats) {
+            let text = `【 ⚔️ 隊伍寶物分贓結算明細 】\n`;
+            text += `----------------------------------------\n`;
+            text += `👥 參與成員 (${state.members.length}人)：${state.members.join(', ')}\n`;
+            text += `💎 寶物登記 (${state.items.length}件)：\n`;
+            state.items.forEach((item, index) => {
+                text += `  ${index + 1}. ${item.name} | 價格: ${formatNumber(item.price)}元 | ${item.buyer ? '買家: ' + item.buyer : '全體平分'}\n`;
+            });
+            text += `----------------------------------------\n`;
+            text += `📊 最終結算總表 (淨收支):\n`;
+            state.members.forEach(m => {
+                const d = stats[m];
+                const sign = d.net > 0 ? '+' : '';
+                text += `• ${m}: 買裝花費 ${formatNumber(Math.round(d.spent))} | 分紅收益 ${formatNumber(Math.round(d.earned))} | 淨收支 ${sign}${formatNumber(Math.round(d.net))}元\n`;
+            });
+            text += `----------------------------------------\n`;
+            text += `💡 結算邏輯說明：數值為「+」代表實領金額，數值為「-」代表需補繳金額。`;
+
+            document.getElementById('reportOutput').value = text;
+        }
+
+        function copyDiscordReport() {
+            const textarea = document.getElementById('reportOutput');
+            textarea.select();
+            document.execCommand('copy');
+            alert('✅ 結算明細已成功複製到剪貼簿，可直接貼到聊天頻道！');
+        }
     </script>
 </body>
 </html>
