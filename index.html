@@ -17,7 +17,7 @@
         <header class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-slate-900">⚔️ 隊伍寶物分贓計算器</h1>
-                <p class="text-sm text-slate-500 mt-1">公平分帳，買家自食其果（買家無法均分自己買裝的錢）</p>
+                <p class="text-sm text-slate-500 mt-1">公平分帳 買家無法均分自己買裝的錢!!</p>
             </div>
             <div class="flex gap-2 w-full md:w-auto">
                 <button onclick="loadSample()" class="flex-1 md:flex-none px-4 py-2 text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-xl transition">載入範例</button>
@@ -123,9 +123,8 @@
 
     </div>
 
-    <!-- JavaScript 邏輯與千分位格式化 -->
+    <!-- JavaScript 邏輯 -->
     <script>
-        // 資料結構
         let state = {
             members: [],
             items: []
@@ -145,19 +144,20 @@
             return isNaN(val) ? 0 : val;
         }
 
-        // 綁定輸入框即時千分位轉換
+        // 價格輸入處理（允許順暢輸入，失去焦點或變更時才完美排版，避免游標亂跳）
         function handlePriceInput(inputElem, itemId) {
-            let rawVal = parseNumber(inputElem.value);
-            // 更新資料狀態
+            const rawVal = parseNumber(inputElem.value);
             const item = state.items.find(i => i.id === itemId);
             if (item) {
                 item.price = rawVal;
                 calculate();
             }
-            // 游標保持與格式化呈現
-            // 為了輸入流暢，只在失焦或數值確定後完整格式化，或者即時格式化
-            const cursorPosition = inputElem.selectionStart;
-            inputElem.value = rawVal === 0 && inputElem.value === '' ? '' : formatNumber(rawVal);
+        }
+
+        // 游標離開輸入框時自動補上千分位逗號
+        function handlePriceBlur(inputElem) {
+            const rawVal = parseNumber(inputElem.value);
+            inputElem.value = rawVal === 0 ? '' : formatNumber(rawVal);
         }
 
         // 初始化載入
@@ -216,7 +216,6 @@
 
         function removeMember(name) {
             state.members = state.members.filter(m => m !== name);
-            // 同時清除寶物買家中包含此人的設定
             state.items.forEach(item => {
                 if (item.buyer === name) item.buyer = "";
             });
@@ -232,7 +231,6 @@
                 return;
             }
 
-            // 支援空白、換行、逗號、頓號、Tab 分隔
             const rawNames = text.split(/[\s,\，、\t\n]+/);
             const newNames = [...new Set(rawNames.map(n => n.trim()).filter(n => n.length > 0))];
 
@@ -246,7 +244,6 @@
             if (mode === 'replace') {
                 state.members = newNames;
             } else {
-                // 追加並去除重複
                 const combined = [...state.members, ...newNames];
                 state.members = [...new Set(combined)];
             }
@@ -278,17 +275,12 @@
         function updateItemField(id, field, value) {
             const item = state.items.find(i => i.id === id);
             if (item) {
-                if (field === 'price') {
-                    item.price = parseNumber(value);
-                } else {
-                    item[field] = value;
-                }
+                item[field] = value;
                 saveToLocalStorage();
-                renderCalculationOnly(); // 局部重新計算顯示，不破壞輸入焦點
+                renderCalculationOnly();
             }
         }
 
-        // 渲染全部
         function renderAll() {
             renderMembers();
             renderItems();
@@ -326,7 +318,12 @@
                         <input type="text" value="${item.name}" oninput="updateItemField(${item.id}, 'name', this.value)" placeholder="寶物名稱" class="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none w-full md:w-48">
                         
                         <div class="relative flex-1 md:w-40">
-                            <input type="text" value="${item.price ? formatNumber(item.price) : ''}" oninput="handlePriceInput(this, ${item.id})" placeholder="售出價格" class="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none w-full text-right pr-8">
+                            <input type="text" 
+                                   value="${item.price ? formatNumber(item.price) : ''}" 
+                                   oninput="handlePriceInput(this, ${item.id})" 
+                                   onblur="handlePriceBlur(this)" 
+                                   placeholder="售出價格" 
+                                   class="px-3 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none w-full text-right pr-8">
                             <span class="absolute right-3 top-2.5 text-xs text-slate-400 pointer-events-none">元</span>
                         </div>
 
@@ -346,7 +343,6 @@
             calculate();
         }
 
-        // 計算核心與總表呈現
         function calculate() {
             renderCalculationOnly();
         }
@@ -354,13 +350,11 @@
         function renderCalculationOnly() {
             const totalMembersCount = state.members.length;
             
-            // 初始化結算結構
             let stats = {};
             state.members.forEach(m => {
                 stats[m] = { spent: 0, earned: 0, net: 0 };
             });
 
-            // 逐筆寶物計算
             state.items.forEach(item => {
                 const price = Number(item.price) || 0;
                 const buyer = item.buyer;
@@ -372,15 +366,13 @@
                 }
 
                 if (!buyer) {
-                    // 情況A：無人購買，全體平分
                     const share = price / totalMembersCount;
                     state.members.forEach(m => {
                         stats[m].earned += share;
                     });
                     if (hintElem) hintElem.innerText = `💡 全體 ${totalMembersCount} 人平分，每人得 ${formatNumber(Math.round(share))} 元`;
                 } else {
-                    // 情況B：有人購買
-                    stats[buyer].spent += price; // 買家付全額
+                    stats[buyer].spent += price;
                     
                     const nonBuyers = state.members.filter(m => m !== buyer);
                     const nonBuyersCount = nonBuyers.length;
@@ -397,13 +389,10 @@
                 }
             });
 
-            // 計算最終淨收支 (net = earned - spent)
-            // 若為買家：earned 為 0 (假設他沒分到這筆錢)，net = 0 - spent = -spent
             Object.keys(stats).forEach(m => {
                 stats[m].net = stats[m].earned - stats[m].spent;
             });
 
-            // 渲染總表
             const tbody = document.getElementById('summaryTableBody');
             if (state.members.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="4" class="text-center py-6 text-slate-400">尚無隊員資料</td></tr>`;
@@ -428,7 +417,6 @@
             saveToLocalStorage();
         }
 
-        // 生成複製文字
         function generateReportText(stats) {
             let text = `【 ⚔️ 隊伍寶物分贓結算明細 】\n`;
             text += `----------------------------------------\n`;
@@ -442,7 +430,7 @@
             state.members.forEach(m => {
                 const d = stats[m];
                 const sign = d.net > 0 ? '+' : '';
-                text += `• ${m}: 買裝花費 ${formatNumber(Math.round(d.spent))} | 分紅收益 ${formatNumber(Math.round(d.earned))} | 淨收支 ${sign}${formatNumber(Math.round(d.net))}元\n`;
+                text += `• ${m}: 購買花費 ${formatNumber(Math.round(d.spent))} | 分紅收益 ${formatNumber(Math.round(d.earned))} | 淨收支 ${sign}${formatNumber(Math.round(d.net))}元\n`;
             });
             text += `----------------------------------------\n`;
             text += `💡 結算邏輯說明：數值為「+」代表實領金額，數值為「-」代表需補繳金額。`;
