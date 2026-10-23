@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-TW" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>寶物分贓計算器</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        game: {
+                            base: '#0f172a',
+                            card: '#1e293b',
+                            accent: '#6366f1',
+                            gold: '#f59e0b',
+                            green: '#10b981',
+                            red: '#ef4444'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        [v-cloak] { display: none; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
+    <div id="app" v-cloak class="max-w-6xl mx-auto px-4 py-6">
+        
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-slate-800">
+            <div>
+                <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-indigo-400 to-purple-500 flex items-center gap-3">
+                    <i class="fa-solid me-1 fa-coins text-amber-400"></i> 寶物分贓計算器
+                </h1>
+                <p class="text-slate-400 text-sm mt-1">打寶分錢好幫手：自動計算隊員獨吞與平分金額</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button @click="loadExample" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-wand-magic-sparkles text-amber-400"></i> 載入範例
+                </button>
+                <button @click="resetAll" class="px-3 py-2 bg-slate-800 hover:bg-red-950/50 hover:text-red-400 text-slate-300 text-xs font-semibold rounded-lg border border-slate-700 hover:border-red-800/50 transition flex items-center gap-1.5">
+                    <i class="fa-solid fa-trash-can"></i> 重置清空
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Layout Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            
+            <!-- Left Column: Settings & Items Input (7 cols) -->
+            <div class="lg:col-span-7 space-y-6">
+                
+                <!-- 1. Team Members Setup -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                            <i class="fa-solid fa-users text-indigo-400"></i> 隊伍成員設定 
+                            <span class="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-normal">
+                                共 {{ members.length }} 人
+                            </span>
+                        </h2>
+                        <div class="flex items-center gap-2">
+                            <button @click="showImportModal = !showImportModal" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-indigo-300 font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-md">
+                                <i class="fa-solid fa-file-import"></i> 批次文字匯入
+                            </button>
+                            <button @click="addMember" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-md">
+                                <i class="fa-solid fa-plus"></i> 新增成員
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Batch Import Area (Expandable/Modal Panel) -->
+                    <div v-if="showImportModal" class="mb-4 bg-slate-800/90 border border-indigo-500/40 rounded-xl p-4 transition-all">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="text-xs font-bold text-indigo-300 flex items-center gap-1">
+                                <i class="fa-solid fa-paste"></i> 貼上成員名單（以空格、換行、逗號或頓號分隔）
+                            </label>
+                            <button @click="showImportModal = false" class="text-slate-400 hover:text-slate-200 text-xs">
+                                <i class="fa-solid fa-xmark"></i> 關閉
+                            </button>
+                        </div>
+                        <textarea 
+                            v-model="importText" 
+                            rows="3" 
+                            placeholder="例如貼上：&#10;玩家A 玩家B 玩家C 玩家D&#10;或&#10;玩家A, 玩家B, 玩家C, 玩家D"
+                            class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 font-mono mb-3"
+                        ></textarea>
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-[11px] text-slate-400">
+                                預覽解析：<span class="text-amber-400 font-semibold">{{ parsedImportNames.length }}</span> 位成員
+                            </span>
+                            <div class="flex items-center gap-2">
+                                <button 
+                                    @click="processImport(false)" 
+                                    :disabled="parsedImportNames.length === 0"
+                                    class="text-xs bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-medium px-3 py-1.5 rounded-lg transition"
+                                >
+                                    覆蓋現有名單
+                                </button>
+                                <button 
+                                    @click="processImport(true)" 
+                                    :disabled="parsedImportNames.length === 0"
+                                    class="text-xs bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-indigo-300 font-medium px-3 py-1.5 rounded-lg transition"
+                                >
+                                    追加到現有名單
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Member Tags List -->
+                    <div class="flex flex-wrap gap-2 mb-3">
+                        <div v-for="(member, idx) in members" :key="idx" class="flex items-center bg-slate-800 border border-slate-700 rounded-lg overflow-hidden group hover:border-indigo-500/50 transition">
+                            <input 
+                                type="text" 
+                                v-model="members[idx]" 
+                                class="bg-transparent text-xs text-slate-200 px-2.5 py-1.5 w-24 focus:outline-none focus:bg-slate-900 focus:text-indigo-300 font-medium"
+                                placeholder="成員名字"
+                            />
+                            <button 
+                                @click="removeMember(idx)" 
+                                :disabled="members.length <= 1"
+                                class="text-slate-500 hover:text-red-400 px-2 py-1.5 transition disabled:opacity-30 disabled:hover:text-slate-500"
+                                title="移除成員"
+                            >
+                                <i class="fa-solid fa-xmark text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Loot Items List & Input -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                            <i class="fa-solid fa-gem text-amber-400"></i> 寶物清單登記
+                        </h2>
+                        <button @click="addItem" class="text-xs bg-amber-600 hover:bg-amber-500 text-white font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-md">
+                            <i class="fa-solid fa-plus"></i> 新增寶物
+                        </button>
+                    </div>
+
+                    <!-- Empty State -->
+                    <div v-if="items.length === 0" class="text-center py-10 border-2 border-dashed border-slate-800 rounded-xl">
+                        <i class="fa-solid fa-box-open text-3xl text-slate-600 mb-2"></i>
+                        <p class="text-slate-500 text-sm">目前沒有寶物，點擊右上角「新增寶物」開始記錄吧！</p>
+                    </div>
+
+                    <!-- Item Cards -->
+                    <div class="space-y-4">
+                        <div v-for="(item, index) in items" :key="item.id" class="bg-slate-800/60 border border-slate-700/80 rounded-xl p-4 relative group hover:border-slate-600 transition">
+                            
+                            <!-- Card Header: Title & Delete Button -->
+                            <div class="flex items-center justify-between gap-3 mb-3">
+                                <div class="flex items-center gap-2 flex-1">
+                                    <span class="text-xs font-bold text-slate-500 bg-slate-800 px-2 py-1 rounded">#{{ index + 1 }}</span>
+                                    <input 
+                                        type="text" 
+                                        v-model="item.name" 
+                                        placeholder="寶物名稱 (例如：滅世烈焰劍)"
+                                        class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm font-semibold text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 flex-1"
+                                    />
+                                </div>
+                                <button @click="removeItem(index)" class="text-slate-500 hover:text-red-400 p-1.5 transition">
+                                    <i class="fa-solid fa-trash-can"></i>
+                                </button>
+                            </div>
+
+                            <!-- Price & Sale Type -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">寶物售價 / 出價 ($P)</label>
+                                    <div class="relative">
+                                        <span class="absolute left-3 top-2 text-slate-500 text-xs">$</span>
+                                        <input 
+                                            type="number" 
+                                            v-model.number="item.price" 
+                                            min="0"
+                                            placeholder="0"
+                                            class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-7 pr-3 py-1.5 text-sm text-amber-400 font-bold focus:outline-none focus:border-indigo-500"
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-slate-400 mb-1">處理管道</label>
+                                    <select 
+                                        v-model="item.type" 
+                                        class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                                    >
+                                        <option value="public">直接賣出 (所有人平分)</option>
+                                        <option value="member">隊員購買 (買家不參與分錢)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Member Buyers Selector (If item.type === 'member') -->
+                            <div v-if="item.type === 'member'" class="mt-3 pt-3 border-t border-slate-700/60">
+                                <label class="block text-xs font-medium text-amber-400 mb-2">
+                                    <i class="fa-solid fa-cart-shopping me-1"></i> 請勾選購買的隊員（買家）:
+                                </label>
+                                <div class="flex flex-wrap gap-2">
+                                    <label 
+                                        v-for="m in members" 
+                                        :key="m" 
+                                        class="inline-flex items-center gap-1.5 bg-slate-900 border px-2.5 py-1 rounded-lg cursor-pointer text-xs transition"
+                                        :class="item.buyers.includes(m) ? 'border-amber-500 bg-amber-500/10 text-amber-300 font-semibold' : 'border-slate-700 text-slate-400 hover:border-slate-600'"
+                                    >
+                                        <input 
+                                            type="checkbox" 
+                                            :value="m" 
+                                            v-model="item.buyers"
+                                            class="hidden"
+                                        />
+                                        <i class="fa-solid" :class="item.buyers.includes(m) ? 'fa-square-check text-amber-400' : 'fa-square text-slate-600'"></i>
+                                        <span>{{ m }}</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Calculation Note Badge -->
+                            <div class="mt-3 bg-slate-900/80 rounded-lg p-2.5 text-xs text-slate-400 flex items-center justify-between">
+                                <span v-if="item.type === 'public'">
+                                    <i class="fa-solid fa-circle-info text-indigo-400 me-1"></i> 
+                                    全隊 {{ members.length }} 人平分，每人分得：
+                                    <strong class="text-emerald-400">${{ Math.round(getItemSplit(item).sharePerPerson) }}</strong>
+                                </span>
+                                <span v-else-if="item.buyers.length === 0" class="text-amber-400/90">
+                                    <i class="fa-solid fa-triangle-exclamation me-1"></i> 請選擇至少一位購買者！
+                                </span>
+                                <span v-else-if="item.buyers.length >= members.length" class="text-red-400">
+                                    <i class="fa-solid fa-triangle-exclamation me-1"></i> 所有人都是買家，無人可分錢！
+                                </span>
+                                <span v-else>
+                                    <i class="fa-solid fa-circle-info text-amber-400 me-1"></i> 
+                                    {{ item.buyers.length }} 人購買，其他 {{ members.length - item.buyers.length }} 人平分，每位非買家分得：
+                                    <strong class="text-emerald-400">${{ Math.round(getItemSplit(item).sharePerPerson) }}</strong>
+                                </span>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Right Column: Final Settlement Dashboard (5 cols) -->
+            <div class="lg:col-span-5 space-y-6">
+                
+                <!-- Final Result Card -->
+                <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl sticky top-6">
+                    <div class="flex items-center justify-between mb-5 pb-3 border-b border-slate-800">
+                        <h2 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+                            <i class="fa-solid fa-calculator text-emerald-400"></i> 最終結算總表
+                        </h2>
+                        <button 
+                            @click="copySummary" 
+                            class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-md"
+                        >
+                            <i class="fa-solid fa-copy"></i> 複製文字結果
+                        </button>
+                    </div>
+
+                    <!-- Overall Summary Stats -->
+                    <div class="grid grid-cols-2 gap-3 mb-5">
+                        <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50">
+                            <div class="text-xs text-slate-400 mb-1">寶物總總額</div>
+                            <div class="text-xl font-black text-amber-400">${{ totalLootValue }}</div>
+                        </div>
+                        <div class="bg-slate-800/80 rounded-xl p-3 border border-slate-700/50">
+                            <div class="text-xs text-slate-400 mb-1">登記總件數</div>
+                            <div class="text-xl font-black text-indigo-400">{{ items.length }} 件</div>
+                        </div>
+                    </div>
+
+                    <!-- Per-Member Settlement List -->
+                    <div class="space-y-3 mb-6">
+                        <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider">個人收支明細</h3>
+                        
+                        <div 
+                            v-for="stat in memberStats" 
+                            :key="stat.name" 
+                            class="bg-slate-800/50 border border-slate-700/60 rounded-xl p-3.5 transition hover:border-slate-600"
+                        >
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="font-bold text-slate-200 text-sm flex items-center gap-1.5">
+                                    <i class="fa-solid fa-user-circle text-slate-400"></i> {{ stat.name }}
+                                </span>
+                                <!-- Net badge -->
+                                <span 
+                                    class="text-xs font-extrabold px-2.5 py-1 rounded-md"
+                                    :class="{
+                                        'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30': stat.net > 0,
+                                        'bg-red-500/20 text-red-400 border border-red-500/30': stat.net < 0,
+                                        'bg-slate-700 text-slate-300': stat.net === 0
+                                    }"
+                                >
+                                    {{ stat.net > 0 ? '應領取 +' + Math.round(stat.net) : (stat.net < 0 ? '應補繳 -' + Math.abs(Math.round(stat.net)) : '不拿不付 $0') }}
+                                </span>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 text-xs text-slate-400 bg-slate-900/60 p-2 rounded-lg">
+                                <div>
+                                    <span>分紅收益：</span>
+                                    <span class="text-emerald-400 font-semibold">+${{ Math.round(stat.gain) }}</span>
+                                </div>
+                                <div>
+                                    <span>買裝支出：</span>
+                                    <span class="text-red-400 font-semibold">-${{ Math.round(stat.spent) }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Transfer Guidance / Lazy Pack -->
+                    <div class="bg-indigo-950/40 border border-indigo-800/40 rounded-xl p-4">
+                        <h4 class="text-xs font-bold text-indigo-300 mb-2 flex items-center gap-1.5">
+                            <i class="fa-solid fa-comments-dollar"></i> 團隊結算懶人包
+                        </h4>
+                        <ul class="text-xs text-slate-300 space-y-1.5 list-disc list-inside">
+                            <li v-for="guide in transferGuide" :key="guide">
+                                {{ guide }}
+                            </li>
+                            <li v-if="transferGuide.length === 0" class="text-slate-500 list-none italic">
+                                尚無需要進行的轉帳。
+                            </li>
+                        </ul>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Toast Notification -->
+        <div 
+            v-if="toastMessage" 
+            class="fixed bottom-6 right-6 bg-emerald-600 text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs font-bold flex items-center gap-2 transition transform animate-bounce"
+        >
+            <i class="fa-solid fa-circle-check"></i> {{ toastMessage }}
+        </div>
+
+    </div>
+
+    <script>
+        const { createApp, ref, computed } = Vue;
+
+        createApp({
+            setup() {
+                // Member Names State
+                const members = ref(['玩家A', '玩家B', '玩家C', '玩家D']);
+
+                // Batch Import States
+                const showImportModal = ref(false);
+                const importText = ref('');
+
+                // Parse raw text into array of names using spaces, commas, newlines, tabs, and ideographic commas (頓號)
+                const parsedImportNames = computed(() => {
+                    if (!importText.value) return [];
+                    return importText.value
+                        .split(/[\s,，、\t\n]+/)
+                        .map(name => name.trim())
+                        .filter(name => name.length > 0);
+                });
+
+                // Execute Batch Import
+                const processImport = (append = false) => {
+                    const newNames = parsedImportNames.value;
+                    if (newNames.length === 0) return;
+
+                    if (append) {
+                        // Append uniquely
+                        const currentSet = new Set(members.value);
+                        newNames.forEach(name => currentSet.add(name));
+                        members.value = Array.from(currentSet);
+                        showToast(`已成功追加 ${newNames.length} 位成員！`);
+                    } else {
+                        // Overwrite
+                        members.value = newNames;
+                        // Clean up buyers list for non-existent members
+                        items.value.forEach(item => {
+                            item.buyers = item.buyers.filter(b => newNames.includes(b));
+                        });
+                        showToast(`已成功匯入 ${newNames.length} 位新成員！`);
+                    }
+
+                    importText.value = '';
+                    showImportModal.value = false;
+                };
+
+                // Items List State
+                const items = ref([
+                    {
+                        id: 1,
+                        name: '傳奇龍之劍',
+                        price: 12000,
+                        type: 'member',
+                        buyers: ['玩家A']
+                    },
+                    {
+                        id: 2,
+                        name: '魔法藥水裝備組',
+                        price: 4000,
+                        type: 'public',
+                        buyers: []
+                    }
+                ]);
+
+                const toastMessage = ref('');
+
+                // Helper to trigger alert toast
+                const showToast = (msg) => {
+                    toastMessage.value = msg;
+                    setTimeout(() => {
+                        toastMessage.value = '';
+                    }, 2500);
+                };
+
+                // Member Operations
+                const addMember = () => {
+                    const nextNum = members.value.length + 1;
+                    members.value.push(`玩家${nextNum}`);
+                };
+
+                const removeMember = (index) => {
+                    if (members.value.length <= 1) return;
+                    const removedName = members.value[index];
+                    members.value.splice(index, 1);
+                    
+                    // Clean up buyers list in items
+                    items.value.forEach(item => {
+                        item.buyers = item.buyers.filter(b => b !== removedName);
+                    });
+                };
+
+                // Item Operations
+                const addItem = () => {
+                    items.value.push({
+                        id: Date.now(),
+                        name: '',
+                        price: 0,
+                        type: 'public',
+                        buyers: []
+                    });
+                };
+
+                const removeItem = (index) => {
+                    items.value.splice(index, 1);
+                };
+
+                // Reset All
+                const resetAll = () => {
+                    members.value = ['玩家A', '玩家B', '玩家C', '玩家D'];
+                    items.value = [];
+                    importText.value = '';
+                    showImportModal.value = false;
+                    showToast('已重置所有資料');
+                };
+
+                // Load Example
+                const loadExample = () => {
+                    members.value = ['隊長老王', '補師小美', '狂戰阿強', '法師小明'];
+                    items.value = [
+                        { id: 1, name: '屠龍聖劍', price: 15000, type: 'member', buyers: ['狂戰阿強'] },
+                        { id: 2, name: '大天使法杖', price: 8000, type: 'member', buyers: ['法師小明'] },
+                        { id: 3, name: '雜物材料包', price: 4000, type: 'public', buyers: [] }
+                    ];
+                    showToast('已載入範例隊伍與寶物資料');
+                };
+
+                // Calculate Single Item Split
+                const getItemSplit = (item) => {
+                    const N = members.value.length;
+                    const price = Number(item.price) || 0;
+
+                    if (item.type === 'public' || item.buyers.length === 0) {
+                        return {
+                            sharePerPerson: N > 0 ? price / N : 0,
+                            buyers: []
+                        };
+                    } else {
+                        const B = item.buyers.length;
+                        const nonBuyersCount = N - B;
+                        const sharePerPerson = nonBuyersCount > 0 ? price / nonBuyersCount : 0;
+                        const pricePerBuyer = B > 0 ? price / B : 0;
+
+                        return {
+                            sharePerPerson,
+                            pricePerBuyer,
+                            buyers: item.buyers
+                        };
+                    }
+                };
+
+                // Total value of all recorded items
+                const totalLootValue = computed(() => {
+                    return items.value.reduce((sum, item) => sum + (Number(item.price) || 0), 0);
+                });
+
+                // Compute statistics per member (Spent, Gain, Net)
+                const memberStats = computed(() => {
+                    const statsMap = {};
+
+                    members.value.forEach(m => {
+                        statsMap[m] = { name: m, spent: 0, gain: 0, net: 0 };
+                    });
+
+                    items.value.forEach(item => {
+                        const N = members.value.length;
+                        const price = Number(item.price) || 0;
+                        if (price <= 0 || N === 0) return;
+
+                        if (item.type === 'public' || item.buyers.length === 0) {
+                            const share = price / N;
+                            members.value.forEach(m => {
+                                if (statsMap[m]) statsMap[m].gain += share;
+                            });
+                        } else {
+                            const buyers = item.buyers.filter(b => members.value.includes(b));
+                            const B = buyers.length;
+                            const nonBuyers = members.value.filter(m => !buyers.includes(m));
+
+                            if (B > 0) {
+                                const costPerBuyer = price / B;
+                                buyers.forEach(b => {
+                                    if (statsMap[b]) statsMap[b].spent += costPerBuyer;
+                                });
+                            }
+
+                            if (nonBuyers.length > 0) {
+                                const share = price / nonBuyers.length;
+                                nonBuyers.forEach(nb => {
+                                    if (statsMap[nb]) statsMap[nb].gain += share;
+                                });
+                            }
+                        }
+                    });
+
+                    return Object.values(statsMap).map(s => {
+                        s.net = s.gain - s.spent;
+                        return s;
+                    });
+                });
+
+                // Generate Transfer Guidance Sentences
+                const transferGuide = computed(() => {
+                    const list = [];
+                    const payers = memberStats.value.filter(s => Math.round(s.net) < 0);
+                    const receivers = memberStats.value.filter(s => Math.round(s.net) > 0);
+
+                    if (payers.length === 0 && receivers.length === 0) {
+                        return ['無須進行金額補繳或領取。'];
+                    }
+
+                    payers.forEach(p => {
+                        list.push(`【${p.name}】需支付補繳 $${Math.abs(Math.round(p.net))} 入公款庫`);
+                    });
+
+                    receivers.forEach(r => {
+                        list.push(`【${r.name}】可從公款庫領取 $${Math.round(r.net)}`);
+                    });
+
+                    return list;
+                });
+
+                // Copy Text Result to Clipboard
+                const copySummary = () => {
+                    let text = `========================\n`;
+                    text += `⚔️ 寶物分贓結算清單 ⚔️\n`;
+                    text += `========================\n`;
+                    text += `隊伍人數：${members.value.length} 人\n`;
+                    text += `寶物總價值：$${totalLootValue.value}\n\n`;
+
+                    text += `📦 【寶物明細】\n`;
+                    items.value.forEach((item, idx) => {
+                        const price = item.price || 0;
+                        if (item.type === 'public' || item.buyers.length === 0) {
+                            text += `${idx + 1}. ${item.name || '未命名寶物'} - $${price} (公家平分)\n`;
+                        } else {
+                            text += `${idx + 1}. ${item.name || '未命名寶物'} - $${price} (買家: ${item.buyers.join(', ')})\n`;
+                        }
+                    });
+
+                    text += `\n💰 【個人結算結果】\n`;
+                    memberStats.value.forEach(s => {
+                        const netText = s.net > 0 ? `應領取 +$${Math.round(s.net)}` : (s.net < 0 ? `應補繳 -$${Math.abs(Math.round(s.net))}` : `平手 $0`);
+                        text += `• ${s.name}: ${netText} (分紅 +$${Math.round(s.gain)} / 買裝 -$${Math.round(s.spent)})\n`;
+                    });
+
+                    text += `\n📋 【轉帳懶人包】\n`;
+                    transferGuide.value.forEach(g => {
+                        text += `• ${g}\n`;
+                    });
+
+                    // Execute Copy
+                    const dummy = document.createElement('textarea');
+                    document.body.appendChild(dummy);
+                    dummy.value = text;
+                    dummy.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(dummy);
+
+                    showToast('已成功複製結算報告至剪貼簿！');
+                };
+
+                return {
+                    members,
+                    items,
+                    showImportModal,
+                    importText,
+                    parsedImportNames,
+                    processImport,
+                    toastMessage,
+                    addMember,
+                    removeMember,
+                    addItem,
+                    removeItem,
+                    resetAll,
+                    loadExample,
+                    getItemSplit,
+                    totalLootValue,
+                    memberStats,
+                    transferGuide,
+                    copySummary
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
